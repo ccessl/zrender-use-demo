@@ -1,0 +1,314 @@
+<!--created by chencen -->
+<!--on 2018/1/11-->
+<!--blog cc-fys-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>catch fruit</title>
+    <script type="text/javascript" src="./zrender.js"></script>
+</head>
+<div>
+    <div id="myimg" style="display:none">
+        <img src="./images/apple.png"/>
+        <img src="./images/orange.png"/>
+        <img src="./images/pineapple.png"/>
+        <img src="./images/strawberry.png"/>
+        <img src="./images/basket.png"/>
+    </div>
+    <div class="example-container" style="width:500px;height:600px;border:1px solid black;margin:0 auto"></div>
+</div>
+<body>
+<script>
+    window.onload=function() //初始化
+    {
+        //为了保证图片加载完成
+        var container=document.getElementsByClassName('example-container')[0];
+        new CatchFruit(container);
+    };
+
+    //分数规则
+    var rule={
+        apple:10,
+        orange:5,
+        pineapple:15,
+        strawberry:30
+    };
+
+    function CatchFruit(elememt){
+        this.element=elememt;
+        this.zr = zrender.init(this.element);
+        this.w= this.zr.getWidth();
+        this.h = this.zr.getHeight();
+
+        this.keydown={};
+        this.fruitStyle={
+            style: {
+                width:35,
+                height:35,
+                x:0,
+                y:0
+            }
+        };
+        this.zrBGGroup=new zrender.Group();
+        this.zrBGGroup.position=[0,0];
+        this.zr.add(this.zrBGGroup);
+
+        this.zrGroup=new zrender.Group();
+        this.zrGroup.position=[0,40];
+        this.zr.add(this.zrGroup);
+
+        this.bottomGroup=new zrender.Group();
+        this.bottomGroup.position=[0,this.h-40];
+        this.zr.add(this.bottomGroup);
+
+        this.effectGroup=new zrender.Group();
+        this.effectGroup.position=[0,0];
+        this.zr.add(this.effectGroup);
+
+        this.init();
+    }
+    CatchFruit.prototype={
+        constructor: CatchFruit,
+        //初始化
+        init: function () {
+            var self=this;
+            //画背景
+            self.drawBG();
+            //绑定事件
+            self.bindEvent();
+            //更新状态
+            self.updateState();
+
+
+        },
+
+        //画背景
+        drawBG:function() {
+            var zrBGGroup=this.zrBGGroup;
+            var bottomGroup=this.bottomGroup;
+            var w=this.w;
+            var h=this.h;
+            var bg = new zrender.Rect({
+                shape: {
+                    width: w,
+                    height: h
+                },
+                style: {
+                    fill: new zrender.RadialGradient(0.5, -0.1, 1, [
+                        {
+                            offset: 0,
+                            color: '#37B0FF'
+                        },
+                        {
+                            offset: 1,
+                            color: '#efe3ff'
+                        }
+                    ])
+                }
+            });
+            zrBGGroup.add(bg);
+            zrBGGroup.add(new zrender.Rect({
+                shape: {
+                    width: w,
+                    height: 40
+                },
+                style: {
+                    fill:'#33292f'
+                }
+            }));
+            zrBGGroup.add(new zrender.Rect({
+                shape: {
+                    width: w,
+                    height: 40
+                },
+                style: {
+                    fill:'#33292f'
+                }
+            }));
+            zrBGGroup.add(new zrender.Text({
+                style: {
+                    text:'得分:',
+                    fontSize: '18',
+                    textFill: '#fff'
+                },
+                position: [20, 10]
+            }));
+            this.score=new zrender.Text({
+                style: {
+                    text:'0',
+                    fontSize: '18',
+                    textFill: '#fff'
+                },
+                position: [70, 10]
+            });
+            zrBGGroup.add(this.score);
+
+            //篮子
+            this.basket=new zrender.Image({
+                style: {
+                    image:'images/basket.png',
+                    width:100,
+                    height:40
+                },
+                position:[w/2-50,0]
+            });
+            bottomGroup.add(this.basket);
+
+        },
+
+        //更新效果
+        updateState:function(){
+            var self=this;
+            var w=this.w;
+            var score=this.score;
+
+            this.myinter=setInterval(function(){
+                var zrGroup=self.zrGroup;
+                var basket=self.basket;
+                var random=Math.floor(Math.random()*100); //控制数量
+                var speed=120-random;
+                //pos 的范围是-50 ~w-50
+                var pos=Math.random()*w-50;
+                switch(random)
+                {
+                    case 0:    //丢草莓
+                        self.throwFruit('strawberry',pos,speed);
+                        break;
+                    case 1:
+                    case 2:    //丢苹果
+                        self.throwFruit('apple',pos,speed);
+                        break;
+                    case 3:
+                    case 4:    //丢菠萝
+                        self.throwFruit('pineapple',pos,speed);
+                        break;
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8://丢橘子
+                        self.throwFruit('orange',pos,speed);
+                        break;
+                }
+              //检测及更新显示
+                var basketX=basket.position[0];
+                zrGroup.eachChild(function(item){
+                        var x=item.position[0];
+                        var y=item.position[1];
+                        //大致的判断范围
+                    if(y>w-35&& x>basketX-15&&x<(basketX+100-15))
+                    {
+                        var type=item.fType;
+                        var winScore=rule[type];
+                        //加分
+                        var scoreNOW=Number(score.style.text)+winScore;
+                        self.scoreEffect(winScore);
+                        score.attr({
+                            style: {
+                                text:scoreNOW
+                            }
+                        });
+                        zrGroup.remove(item);
+                    }
+                });
+            },100);
+        },
+
+        //丢水果
+        throwFruit:function(type,pos,speed){
+            var easeType=['linear','quadraticIn','quadraticOut','cubicIn','cubicOut','linear'];
+            var easing=easeType[Math.floor(Math.random()*5)];
+            var zrGroup=this.zrGroup;
+            var h=this.h;
+            var dur=(h-40)/speed*1000;
+            var baseStyle=this.fruitStyle;
+            baseStyle.style.image='images/'+type+'.png';
+            baseStyle.position=[pos,0];
+
+            var onefruit=new zrender.Image(baseStyle);
+            onefruit.fType=type;
+            zrGroup.add(onefruit);
+
+            onefruit.animateTo({
+                position: [pos,h-40],
+                rotation: Math.PI *2
+            }, dur, 0, easing,function(){
+                //结束之后要移除该元素
+                zrGroup.remove(onefruit);
+            });
+        },
+
+        //加分效果
+        scoreEffect:function(winScore){
+             var w=this.w;
+             var h=this.h;
+             var effectGroup=this.effectGroup;
+             var addCore=new zrender.Text({
+                 style: {
+                     text:'+ '+winScore,
+                     fontSize: '25',
+                     textFill: '#ff5140',
+                     textAlign: 'center'
+                 },
+                 position: [w/2, h/2]
+             });
+             effectGroup.add(addCore);
+             addCore.animateTo({
+                style: {
+                    opacity:0
+                },
+                position: [10, 10]
+             }, 1000, 0, 'linear', function () {
+                 effectGroup.remove(addCore);
+             });
+        },
+
+        //绑定事件
+        bindEvent:function(){
+            var self=this;
+            var w=this.w;
+
+            window.addEventListener("keydown", function (e) {
+                var basket=self.basket;
+                var x=basket.position[0];
+                if(e.keyCode==39)   //按下了这个键->
+                {
+                    if((x+20)<=w-50)
+                    {
+                        basket.attr({
+                            position:[x+20,0]
+                        });
+                    }
+                }
+                else if(e.keyCode==37) //按下了<-这个键
+                {
+                    if((x-20)>=-50)
+                    {
+                        basket.attr({
+                            position:[x-20,0]
+                        });
+                    }
+                }
+
+            }, false);
+        },
+
+        dispose:function(){
+            var myinter=this.myinter;
+            clearInterval(myinter);
+
+            this.zrBGGroup.removeAll();
+            this.zrGroup.removeAll();
+            this.bottomGroup.removeAll();
+            this.effectGroup.removeAll();
+
+            var zr = this.zr;
+            zrender.dispose(zr);
+        }
+    };
+
+</script>
+
+</body>
+</html>
